@@ -8,10 +8,18 @@
 <body>
 <script type="text/javascript" charset="utf-8">
 
-    var socket = io();
+    const socket = io();
     socket.on('connect', function() {
         socket.emit('my event', {data: 'I\'m connected!'});
     });
+
+    socket.emit('fetch_networks');
+
+    socket.on('update_networks',(infos) => {
+        const {aps , max_signal } = infos ;
+        console.log(aps);
+        console.log(max_signal);
+    })
 
 
 </script>
