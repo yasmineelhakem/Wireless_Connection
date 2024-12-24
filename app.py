@@ -36,5 +36,13 @@ def fetch_networks():
     else:
         emit('update_networks', {'networks': [], 'max_signal': None})
 
+@socketio.on('connect_to_network')
+def connect_to_network(data):
+    print('wselt lel py ',data['ssid'])
+    p = subprocess.Popen(f"netsh wlan connect name={data['ssid']}", stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out = p.stdout.read().decode('unicode_escape').strip()
+    print(out)
+    emit('connection_status',{'message' : out})
+
 if __name__ == '__main__':
     socketio.run(app, debug=True)

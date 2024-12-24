@@ -6,7 +6,12 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js" integrity="sha512-q/dWJ3kcmjBLU4Qc47E4A9kTB4m3wuTY7vkFJDTZKjTs8jhyGQnaUrxa0Ytd0ssMZhbNua9hE+E7Qv1j+DyZwA==" crossorigin="anonymous"></script>
 </head>
 <body>
-<script type="text/javascript" charset="utf-8">
+    <h1>Available Wifi Networks</h1>
+    <ul id="network-list"></ul>
+    <h3 id="max-signal"></h3>
+    <h3 id="connection-status"></h3>
+    <button id="connect-btn" style="display: none;">Connect</button>
+    <script type="text/javascript" charset="utf-8">
 
     const socket = io();
     socket.on('connect', function() {
@@ -16,10 +21,44 @@
     socket.emit('fetch_networks');
 
     socket.on('update_networks',(infos) => {
-        const {aps , max_signal } = infos ;
-        console.log(aps);
-        console.log(max_signal);
+        //console.log(infos);
+        const { networks , max_signal } = infos ;
+        //console.log(networks);
+        //console.log(max_signal);
+        const networks_list = document.getElementById('network-list');
+        const max = document.getElementById('max-signal');
+        const connectButton = document.getElementById('connect-btn');
+
+        networks_list.innerHTML=''
+        max_signal.innerHTML= ''
+
+        if (networks.length > 0) {
+            networks.forEach(([ssid, signal]) => {
+                const li = document.createElement('li');
+                li.textContent = `SSID: ${ssid}, Signal Strength: ${signal}%`;
+                networks_list.appendChild(li);
+            });
+
+            const [max_ssid, max_strength] = max_signal;
+            max.textContent = `Max Signal: ${max_ssid} ${max_strength}%`;
+            console.log(max_ssid)
+
+            connectButton.style.display = 'block';
+            connectButton.onclick = () => {
+                socket.emit('connect_to_network', { ssid : max_ssid });
+            };
+        }
+
     })
+    socket.on('connection_status',(data)=>{
+        console.log(data);
+        const connection= document.getElementById('connection-status');
+        connection.innerHTML=data.message;
+    })
+
+    setInterval(() => {
+        socket.emit('fetch_networks');
+    }, 4000);
 
 
 </script>
