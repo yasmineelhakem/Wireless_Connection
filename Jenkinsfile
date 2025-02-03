@@ -3,6 +3,7 @@ pipeline {
      environment {
         IMAGE_NAME = "yasmine650/jenkins-flask-app"
         IMAGE_TAG = "${IMAGE_NAME}:${env.GIT_COMMIT}"
+        KUBECONFIG = credentials('kubeconfig-creds')
      }
     stages {
         stage('Setup') {
@@ -44,9 +45,39 @@ pipeline {
             }
         }
 
-        stage('Deploy') {
+        stage('Deploy to Staging')
+        {
+            steps{
+                sh 'kubectl config use-context staging-cluster'
+                sh 'kubectl config current-context'
+                sh 'kubectl set image deployment/flask-app flask-app=${IMAGE_TAG}'
+            }
+        }
+
+        stage('Acceptance Test') {
             steps {
-                echo 'Deploying....'
+                script {
+                     // start port-forwarding in the background
+                     def portForward = sh(script: "kubectl port-forward service/flask-app-service 5000:5000 & echo \$!", returnStdout: true).trim()
+
+                     // Wait to ensure port-forward is ready
+                     sleep(time: 5, unit: 'SECONDS')
+
+                     try {
+                         sh "k6 run acceptance-test.js"
+                     } finally {
+                         // End the port forwarding process
+                         sh "kill ${portForward}"
+                     }
+                 }
+             }
+         }
+
+        stage('Deploy to prod') {
+            steps {
+                sh 'kubectl config use-context deployment-cluster'
+                sh 'kubectl config current-context'
+                sh 'kubectl set image deployment/flask-app flask-app=${IMAGE_TAG}'
             }
         }
     }
