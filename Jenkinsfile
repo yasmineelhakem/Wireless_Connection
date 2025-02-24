@@ -8,7 +8,7 @@ pipeline {
     stages {
         stage('Setup') {
             steps {
-                sh """
+                bat """
                 python3 -m venv venv
                 . venv/bin/activate
                 pip install -r requirements.txt """
@@ -20,27 +20,27 @@ pipeline {
                 sh "pytest"
             }
         }*/
-        stage('Login to docker hub') {
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'docker-cred', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')])
-                    { sh 'echo ${PASSWORD} | docker login -u ${USERNAME} --password-stdin'}
-                echo 'Login successfully'
-            }
-        }
 
-        stage('Build Docker Image'){
-            steps
-            {
-                sh 'docker build -t ${IMAGE_TAG} . '
+       stage('Login to docker hub') {
+           steps {
+               withCredentials([usernamePassword(credentialsId: 'docker-cred', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+                   bat 'echo | set /p="%PASSWORD%" | docker login -u %USERNAME% --password-stdin'
+               }
+               echo 'Login successfully'
+           }
+       }
+
+        stage('Build Docker Image') {
+            steps {
+                bat 'docker build -t %IMAGE_TAG% .'
                 echo "Docker image build successfully"
-                sh 'docker image ls'
+                bat 'docker image ls'
             }
         }
 
         stage('Push Docker Image') {
-            steps
-            {
-                sh 'docker push ${IMAGE_TAG}'
+            steps {
+                bat 'docker push %IMAGE_TAG%'
                 echo "Docker image push successfully"
             }
         }
@@ -48,26 +48,29 @@ pipeline {
         stage('Deploy to Staging')
         {
             steps{
-                sh 'kubectl config use-context staging-cluster'
-                sh 'kubectl config current-context'
-                sh 'kubectl set image deployment/flask-app flask-app=${IMAGE_TAG}'
+                bat 'kubectl config use-context staging-cluster'
+                bat 'kubectl config current-context'
+                bat 'kubectl set image deployment/flask-app flask-app=${IMAGE_TAG}'
             }
         }
 
-        stage('Acceptance Test') {
-            steps {
-                script {
-                     // start port-forwarding in the background
-                     def portForward = sh(script: "kubectl port-forward service/flask-app-service 5000:5000 & echo \$!", returnStdout: true).trim()
-
-                     // Wait to ensure port-forward is ready
+         stage('Acceptance Test') {
+             steps {
+                 script {
+                     def portForwardScript = """
+                         @echo off
+                         kubectl port-forward service/flask-app-service 5000:5000
+                     """
+                     writeFile file: 'port-forward.bat', text: portForwardScript
+                     bat 'start /B port-forward.bat'
                      sleep(time: 5, unit: 'SECONDS')
 
                      try {
-                         sh "k6 run acceptance-test.js"
+                         // Run the acceptance tests
+                         bat "k6 run acceptance-test.js"
                      } finally {
                          // End the port forwarding process
-                         sh "kill ${portForward}"
+                         bat "taskkill /F /IM kubectl.exe"
                      }
                  }
              }
@@ -75,9 +78,9 @@ pipeline {
 
         stage('Deploy to prod') {
             steps {
-                sh 'kubectl config use-context deployment-cluster'
-                sh 'kubectl config current-context'
-                sh 'kubectl set image deployment/flask-app flask-app=${IMAGE_TAG}'
+                bat 'kubectl config use-context deployment-cluster'
+                bat 'kubectl config current-context'
+                bat 'kubectl set image deployment/flask-app flask-app=${IMAGE_TAG}'
             }
         }
     }
